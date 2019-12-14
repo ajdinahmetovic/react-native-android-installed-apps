@@ -10,6 +10,7 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.Arguments;
 
+import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -40,7 +41,64 @@ public class RNAndroidInstalledAppsModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
+  public void getPackageName(Promise promise) {
+    try {
+      String packageName = this.reactContext.getApplicationContext().getPackageName();
+      promise.resolve(packageName);
+    } catch(Exception ex) {
+      promise.reject(ex);
+    }
+  }
+
+  @ReactMethod
+  public void startApp(String packageName) {
+      PackageManager pm = this.reactContext.getPackageManager();
+      Intent launchIntent = pm.getLaunchIntentForPackage(packageName);
+      if ( launchIntent != null ) {
+          this.reactContext.startActivity(launchIntent);
+      }
+  }
+
+  @ReactMethod
   public void getApps(Promise promise) {
+    try {
+      PackageManager pm = this.reactContext.getPackageManager();
+      List<PackageInfo> pList = pm.getInstalledPackages(0);
+      WritableArray list = Arguments.createArray();
+      for (int i = 0; i < pList.size(); i++) {
+        PackageInfo packageInfo = pList.get(i);
+        WritableMap appInfo = Arguments.createMap();
+        Intent intent = pm.getLaunchIntentForPackage(packageInfo.packageName);
+        if ( intent == null ) {
+          continue;
+        }
+
+        appInfo.putString("packageName", packageInfo.packageName);
+        appInfo.putString("versionName", packageInfo.versionName);
+        appInfo.putDouble("versionCode", packageInfo.versionCode);
+        appInfo.putDouble("firstInstallTime", (packageInfo.firstInstallTime));
+        appInfo.putDouble("lastUpdateTime", (packageInfo.lastUpdateTime));
+        appInfo.putString("appName", ((String) packageInfo.applicationInfo.loadLabel(pm)).trim());
+
+        Drawable icon = pm.getApplicationIcon(packageInfo.applicationInfo);
+        appInfo.putString("icon", Utility.convert(icon));
+
+        String apkDir = packageInfo.applicationInfo.publicSourceDir;
+        appInfo.putString("apkDir", apkDir);
+
+        File file = new File(apkDir);
+        double size = file.length();
+        appInfo.putDouble("size", size);
+
+        list.pushMap(appInfo);
+      }
+      promise.resolve(list);
+    } catch (Exception ex) {
+      promise.reject(ex);
+    }
+  }
+  @ReactMethod
+  public void getAllApps(Promise promise) {
     try {
       PackageManager pm = this.reactContext.getPackageManager();
       List<PackageInfo> pList = pm.getInstalledPackages(0);
